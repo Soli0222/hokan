@@ -1,5 +1,6 @@
 import { expect, test } from "./helpers/test";
 import { navigateTo } from "./helpers/actions";
+import { getDate } from "./helpers/scenario";
 
 // 主要フロー: 物品登録 → 評価追加 → 処分登録 → ダッシュボード反映。
 test("item registration, valuation, disposal and dashboard reflection", async ({ page }) => {
@@ -23,7 +24,7 @@ test("item registration, valuation, disposal and dashboard reflection", async ({
   // 手放した（処分登録）
   await page.getByRole("button", { name: "手放した" }).click();
   const disposalCard = page.locator("h3", { hasText: "手放した" }).locator("..");
-  await disposalCard.getByLabel("手放した日").fill("2026-01-10");
+  await disposalCard.getByLabel("手放した日").fill(getDate());
   await disposalCard.getByLabel("方法").selectOption("sale");
   await disposalCard.getByLabel(/額（円）/).fill("9000");
   await disposalCard.getByRole("button", { name: "保存" }).click();
