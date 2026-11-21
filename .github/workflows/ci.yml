@@ -255,11 +255,24 @@ jobs:
           cp head/scripts/test-isolation/docker-db.mjs base/scripts/test-isolation/docker-db.mjs
           cp head/compose_db.yaml base/compose_db.yaml
 
+      - name: Detect base app presence
+        id: base-app
+        run: |
+          # The base SHA may predate the app (e.g. the empty initial commit).
+          # In that case there is nothing to benchmark against.
+          if [ -f base/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install base dependencies
+        if: steps.base-app.outputs.exists == 'true'
         working-directory: base
         run: pnpm install --frozen-lockfile
 
       - name: Measure base
+        if: steps.base-app.outputs.exists == 'true'
         working-directory: base
         run: make test-performance PERF_OUTPUT=${{ github.workspace }}/base-performance.json PERF_COMMIT=${{ github.event.pull_request.base.sha }}
 
@@ -272,10 +285,15 @@ jobs:
         run: make test-performance PERF_OUTPUT=${{ github.workspace }}/head-performance.json PERF_COMMIT=${{ github.event.pull_request.head.sha }}
 
       - name: Compare performance
+        if: steps.base-app.outputs.exists == 'true'
         id: compare
         working-directory: head
         continue-on-error: true
         run: pnpm --filter @hokan/backend performance:compare ${{ github.workspace }}/base-performance.json ${{ github.workspace }}/head-performance.json ${{ github.workspace }}/performance-comment.md
+
+      - name: Note skipped comparison
+        if: steps.base-app.outputs.exists == 'false'
+        run: echo "ベース側にアプリケーションが存在しないため、パフォーマンス比較をスキップしました。" > performance-comment.md
 
       - name: Summarize performance result
         if: always()
