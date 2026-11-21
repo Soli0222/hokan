@@ -35,7 +35,7 @@
 
 ## デプロイ
 
-- [Helm chart](charts/hokan/README.md)：Kubernetes への配置と values（ingress ホストは hokan.str08.net）
+- [Helm chart](charts/hokan/README.md)：Kubernetes への配置と values（ingress ホストは hokan.pstr.space）
 - デプロイ設定・DNS・Keycloak クライアントの実登録は pke リポジトリで管理します。
 
 ## ライセンス

@@ -31,7 +31,7 @@ export function LoginPage() {
         <ul className="mt-2 list-disc pl-5">
           <li>HOKAN_OIDC_ISSUER</li>
           <li>HOKAN_OIDC_CLIENT_ID</li>
-          <li>HOKAN_OIDC_REDIRECT_URI（例: https://hokan.str08.net/api/auth/callback）</li>
+          <li>HOKAN_OIDC_REDIRECT_URI（例: https://hokan.pstr.space/api/auth/callback）</li>
           <li>HOKAN_OIDC_ALLOWED_SUBJECTS または HOKAN_OIDC_ALLOWED_EMAILS</li>
         </ul>
         <p className="mt-2">HOKAN_OIDC_CLIENT_SECRET は confidential client のときだけ設定します。</p>
