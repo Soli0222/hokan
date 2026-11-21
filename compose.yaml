@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:18.7-bookworm
+    environment:
+      POSTGRES_USER: hokan
+      POSTGRES_PASSWORD: hokan
+      POSTGRES_DB: hokan
+      TZ: Asia/Tokyo
+    volumes:
+      - db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hokan"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      target: runtime
+    image: hokan-app:latest
+    ports:
+      - "127.0.0.1:3020:3000"
+    environment:
+      DATABASE_URL: postgresql://hokan:hokan@db:5432/hokan
+      TZ: Asia/Tokyo
+      STATIC_DIR: /app/frontend-dist
+      HOKAN_AUTH_MODE: ${HOKAN_AUTH_MODE:-disabled}
+      HOKAN_OIDC_ISSUER: ${HOKAN_OIDC_ISSUER:-}
+      HOKAN_OIDC_CLIENT_ID: ${HOKAN_OIDC_CLIENT_ID:-}
+      # オプション（confidential client のみ必要）
+      HOKAN_OIDC_CLIENT_SECRET: ${HOKAN_OIDC_CLIENT_SECRET:-}
+      HOKAN_OIDC_REDIRECT_URI: ${HOKAN_OIDC_REDIRECT_URI:-}
+      HOKAN_OIDC_ALLOWED_SUBJECTS: ${HOKAN_OIDC_ALLOWED_SUBJECTS:-}
+      HOKAN_OIDC_ALLOWED_EMAILS: ${HOKAN_OIDC_ALLOWED_EMAILS:-}
+      HOKAN_MCP_OAUTH_RESOURCE_URL: ${HOKAN_MCP_OAUTH_RESOURCE_URL:-}
+      HOKAN_COOKIE_SECURE: ${HOKAN_COOKIE_SECURE:-}
+      # OpenTelemetry トレース計装（未設定時は無効）
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4318
+      # OTEL_SERVICE_NAME: hokan-backend
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:

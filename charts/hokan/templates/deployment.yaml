@@ -1,0 +1,180 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hokan.fullname" . }}
+  labels:
+    {{- include "hokan.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "hokan.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "hokan.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "hokan.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.containerPort | quote }}
+            - name: STATIC_DIR
+              value: {{ .Values.config.staticDir | quote }}
+            - name: TZ
+              value: {{ .Values.config.timeZone | quote }}
+            - name: POSTGRES_HOST
+              value: {{ include "hokan.postgresql.host" . | quote }}
+            - name: POSTGRES_PORT
+              value: {{ include "hokan.postgresql.port" . | quote }}
+            - name: POSTGRES_DB
+              value: {{ include "hokan.postgresql.database" . | quote }}
+            - name: POSTGRES_USER
+              value: {{ include "hokan.postgresql.user" . | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hokan.postgresql.secretName" . }}
+                  key: {{ include "hokan.postgresql.secretKey" . }}
+            # DATABASE_URL はイメージの entrypoint が POSTGRES_* から
+            # percent-encode して組み立てる（パスワードの予約文字対策）。
+            {{- with .Values.config.logLevel }}
+            - name: HOKAN_LOG_LEVEL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.config.allowedOrigins }}
+            - name: HOKAN_ALLOWED_ORIGINS
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- with .Values.config.frontendUrl }}
+            - name: HOKAN_FRONTEND_URL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: HOKAN_AUTH_MODE
+              value: {{ .Values.auth.mode | quote }}
+            {{- with .Values.auth.oidc.issuer }}
+            - name: HOKAN_OIDC_ISSUER
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.auth.oidc.clientIdSecret.existingSecret }}
+            - name: HOKAN_OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.oidc.clientIdSecret.existingSecret }}
+                  key: {{ .Values.auth.oidc.clientIdSecret.existingSecretKey }}
+            {{- else }}
+            {{- with .Values.auth.oidc.clientId }}
+            - name: HOKAN_OIDC_CLIENT_ID
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.auth.oidc.redirectUri }}
+            - name: HOKAN_OIDC_REDIRECT_URI
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.auth.oidc.allowedSubjects }}
+            - name: HOKAN_OIDC_ALLOWED_SUBJECTS
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- with .Values.auth.oidc.allowedEmails }}
+            - name: HOKAN_OIDC_ALLOWED_EMAILS
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- with .Values.auth.oidc.clientSecret.existingSecret }}
+            - name: HOKAN_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.auth.oidc.clientSecret.existingSecretKey }}
+            {{- end }}
+            {{- with .Values.auth.cookieSecure }}
+            - name: HOKAN_COOKIE_SECURE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.mcp.oauth.resourceUrl }}
+            - name: HOKAN_MCP_OAUTH_RESOURCE_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.mcp.oauth.maxRequestsPerMinute) "" }}
+            - name: HOKAN_MCP_OAUTH_MAX_REQUESTS_PER_MINUTE
+              value: {{ .Values.mcp.oauth.maxRequestsPerMinute | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.mcp.oauth.maxConcurrentRequests) "" }}
+            - name: HOKAN_MCP_OAUTH_MAX_CONCURRENT_REQUESTS
+              value: {{ .Values.mcp.oauth.maxConcurrentRequests | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.mcp.maxSessions) "" }}
+            - name: HOKAN_MCP_MAX_SESSIONS
+              value: {{ .Values.mcp.maxSessions | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.mcp.maxSessionsPerToken) "" }}
+            - name: HOKAN_MCP_MAX_SESSIONS_PER_TOKEN
+              value: {{ .Values.mcp.maxSessionsPerToken | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.mcp.maxRequestsPerMinute) "" }}
+            - name: HOKAN_MCP_MAX_REQUESTS_PER_MINUTE
+              value: {{ .Values.mcp.maxRequestsPerMinute | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.mcp.maxConcurrentRequests) "" }}
+            - name: HOKAN_MCP_MAX_CONCURRENT_REQUESTS
+              value: {{ .Values.mcp.maxConcurrentRequests | quote }}
+            {{- end }}
+            {{- with .Values.tracing.endpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.tracing.tracesEndpoint }}
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if or .Values.tracing.endpoint .Values.tracing.tracesEndpoint }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.tracing.serviceName | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

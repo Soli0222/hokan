@@ -1,0 +1,321 @@
+@import "tailwindcss";
+
+@theme {
+  /* 面 */
+  --color-background: var(--bg);
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-card: var(--surface-1);
+  --color-muted: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-border: var(--line);
+
+  /* 文字 */
+  --color-foreground: var(--ink);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+
+  /* ブランド */
+  --color-primary: var(--brand);
+  --color-brand: var(--brand);
+  --color-brand-dim: var(--brand-dim);
+
+  /* 意味色 */
+  --color-positive: var(--positive);
+  --color-warning: var(--warning);
+  --color-critical: var(--critical);
+  --color-success: var(--positive);
+  --color-danger: var(--critical);
+
+  /* チャートマーク */
+  --color-chart-actual: var(--chart-actual);
+  --color-chart-forecast: var(--chart-forecast);
+  --color-chart-trend: var(--chart-trend);
+  --color-chart-positive: var(--chart-positive);
+  --color-chart-warning: var(--chart-warning);
+
+  /* 書体 */
+  --font-sans: var(--font-ui);
+
+  /* 形 */
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+
+  /* 影 */
+  --shadow-elev-1: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+:root {
+  color-scheme: dark;
+
+  /* 面 */
+  --bg: #0b0e13; /* ページ地。単色、グラデ廃止 */
+  --surface-1: #11151c; /* カード */
+  --surface-2: #171d26; /* カード内のくぼみ、入力欄 */
+  --line: #262e39; /* 標準ボーダー */
+  --line-strong: #38424e; /* 区切りの強調、フォーカス外周 */
+
+  /* 文字 */
+  --ink: #e9e4da; /* 主文字 */
+  --ink-2: #a9b0ba; /* 副文字 */
+  --ink-3: #7c8590; /* ラベル、目盛り */
+
+  /* ブランド */
+  --brand: #7fc0e8; /* 主ボタン、選択状態 */
+  --brand-dim: #4e7e9c; /* 非活性の選択 */
+
+  /* 意味色（状態にのみ使う） */
+  --positive: #55c1a0; /* 増加、照合一致 */
+  --warning: #e0a83e; /* 可処分マイナス見込み */
+  --critical: #e4573d; /* 実残高マイナス見込み */
+
+  /* チャートマーク */
+  --chart-actual: #3d93cc;
+  --chart-forecast: #2e6e9e;
+  --chart-trend: #a9b0ba;
+  --chart-positive: #2fa983;
+  --chart-warning: #c08828;
+
+  /* 形 */
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+
+  /* 影（2 段のみ） */
+  --elev-0: none;
+  --elev-1: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* 書体 */
+  --font-ui: "IBM Plex Sans JP", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+  border-color: var(--line);
+}
+
+html,
+body {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+#root {
+  min-height: 100vh;
+  min-width: 0;
+  max-width: 100vw;
+  overflow-x: clip;
+  width: 100%;
+}
+
+.recharts-tooltip-wrapper {
+  max-width: min(20rem, calc(100vw - 2rem));
+  overflow-wrap: anywhere;
+}
+
+.recharts-tooltip-wrapper[style*="visibility: hidden"] {
+  display: none;
+}
+
+input,
+select,
+button,
+textarea {
+  font: inherit;
+}
+
+/* 数字・日付は Mono + tabular-nums で組む */
+@utility font-data {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 横スクロールする数値は、IBM Plex Mono の文字が行高を超えて
+ * 縦スクロールを生まないようにする（overflow-x: auto は y も auto にする）。 */
+.font-data.overflow-x-auto {
+  line-height: 1.5;
+}
+
+/* キーボード操作時の可視フォーカス */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/*
+ * 初回リビール（C-2 モーション原則）。ダッシュボード初回ロードの 3 段
+ * （判定 → チャート → リスト）を各 60ms ずらしてフェード+4px 上昇させる。
+ * データを持たないマウント時の一度きりの演出であり、ループやホバー発光はしない。
+ */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes reveal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.reveal-stage-1,
+.reveal-stage-2,
+.reveal-stage-3 {
+  animation: reveal-up 240ms ease-out both;
+}
+
+.reveal-stage-1 {
+  animation-delay: 0ms;
+}
+
+.reveal-stage-2 {
+  animation-delay: 60ms;
+}
+
+.reveal-stage-3 {
+  animation-delay: 120ms;
+}
+
+/*
+ * ダイアログの開閉フィードバック（150〜200ms ease-out）。Radix の Presence が
+ * data-state="closed" のアニメーション完了を待ってからアンマウントするため、
+ * プレーン CSS の @keyframes だけで成立する（追加ライブラリなし）。
+ * transform ではなく scale/opacity を使い、ボトムシート化のための translate
+ * 上書き（dashboard.tsx の確定ダイアログ）と衝突させない。
+ */
+@keyframes dialog-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-content-in {
+  from {
+    opacity: 0;
+    scale: 0.98;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes dialog-content-out {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+
+.dialog-overlay {
+  animation: dialog-overlay-in 180ms ease-out both;
+}
+
+.dialog-overlay[data-state="closed"] {
+  animation: dialog-overlay-out 180ms ease-out both;
+}
+
+.dialog-content {
+  animation: dialog-content-in 180ms ease-out both;
+}
+
+.dialog-content[data-state="closed"] {
+  animation: dialog-content-out 180ms ease-out both;
+}
+
+/* オフラインバナー（B-1）。非侵襲な通常フローの帯として現れるだけなので、フェードのみ。 */
+@keyframes offline-banner-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.offline-banner {
+  animation: offline-banner-in 200ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-stage-1,
+  .reveal-stage-2,
+  .reveal-stage-3 {
+    animation-name: reveal-fade;
+  }
+
+  .dialog-content {
+    animation-name: dialog-fade-in;
+  }
+
+  .dialog-content[data-state="closed"] {
+    animation-name: dialog-fade-out;
+  }
+
+  .offline-banner {
+    animation-duration: 1ms;
+  }
+}
+
+@keyframes dialog-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.edit-page .edit-shell { max-height: calc(100dvh - 2rem); }

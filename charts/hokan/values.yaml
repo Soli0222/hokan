@@ -1,0 +1,160 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/soli0222/hokan
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext: {}
+securityContext: {}
+
+replicaCount: 1
+
+containerPort: 3000
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: hokan.str08.net
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+config:
+  timeZone: Asia/Tokyo
+  staticDir: /app/frontend-dist
+  # HOKAN_LOG_LEVEL. Empty keeps the application default (info)
+  logLevel: ""
+  # HOKAN_ALLOWED_ORIGINS. Origins allowed by CORS. Same-host requests are always allowed
+  allowedOrigins: []
+  # HOKAN_FRONTEND_URL. Redirect target after login. Not needed when the backend
+  # serves the SPA, in which case it redirects to /
+  frontendUrl: ""
+
+# Authentication. OIDC sessions for the UI, API tokens for API/MCP
+auth:
+  # HOKAN_AUTH_MODE: enabled or disabled
+  mode: enabled
+  oidc:
+    issuer: ""
+    clientId: ""
+    # Read the client ID from an existing Secret instead of setting clientId
+    # above. When existingSecret is set, it takes precedence over clientId
+    clientIdSecret:
+      existingSecret: ""
+      existingSecretKey: clientId
+    # Full externally reachable callback URL. The path is always
+    # /api/auth/callback, and the value must match the redirect URI registered
+    # with the IdP exactly, e.g. https://hokan.example.tld/api/auth/callback
+    redirectUri: ""
+    # At least one of allowedSubjects / allowedEmails must be set, otherwise
+    # OIDC is treated as unconfigured and nobody can log in
+    allowedSubjects: []
+    # Matched case-insensitively, and only when the ID token has
+    # email_verified: true
+    allowedEmails: []
+    # Only needed for confidential clients. Public clients can leave this unset
+    clientSecret:
+      existingSecret: ""
+      existingSecretKey: clientSecret
+  # HOKAN_COOKIE_SECURE. Forces Secure cookies and the HTTPS decision that also
+  # drives Strict-Transport-Security. Empty lets the app decide from
+  # x-forwarded-proto
+  cookieSecure: ""
+
+# MCP endpoint limits. Empty keeps the application default
+mcp:
+  oauth:
+    # HOKAN_MCP_OAUTH_RESOURCE_URL. Public /mcp URL and expected OAuth audience.
+    # Empty keeps OAuth discovery disabled and API-token authentication available.
+    resourceUrl: ""
+    # Global pre-authentication OAuth request and concurrency limits.
+    maxRequestsPerMinute: ""
+    maxConcurrentRequests: ""
+  # HOKAN_MCP_MAX_SESSIONS. Concurrent MCP sessions across all tokens (default 1000)
+  maxSessions: ""
+  # HOKAN_MCP_MAX_SESSIONS_PER_TOKEN. Concurrent sessions per token (default 10)
+  maxSessionsPerToken: ""
+  # HOKAN_MCP_MAX_REQUESTS_PER_MINUTE. Requests per minute per token (default 120)
+  maxRequestsPerMinute: ""
+  # HOKAN_MCP_MAX_CONCURRENT_REQUESTS. In-flight requests per token (default 10)
+  maxConcurrentRequests: ""
+
+
+# OpenTelemetry traces. Disabled while both endpoints are empty
+tracing:
+  endpoint: ""
+  tracesEndpoint: ""
+  serviceName: hokan-backend
+
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "18.7-bookworm"
+    pullPolicy: IfNotPresent
+  service:
+    port: 5432
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    size: 1Gi
+    accessModes:
+      - ReadWriteOnce
+  auth:
+    database: hokan
+    user: hokan
+    existingSecret: ""
+    existingSecretKey: POSTGRES_PASSWORD
+  resources: {}
+
+externalPostgres:
+  host: ""
+  port: 5432
+  database: ""
+  user: ""
+  existingSecret: ""
+  existingSecretKey: password
+
+extraEnv: []

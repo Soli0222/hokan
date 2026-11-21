@@ -1,0 +1,12 @@
+services:
+  test-db:
+    image: postgres:18.7-bookworm
+    ports:
+      - "${HOKAN_TEST_PG_PORT:-5555}:5432"
+    environment:
+      POSTGRES_USER: hokan_test
+      POSTGRES_PASSWORD: hokan_test
+      POSTGRES_DB: hokan_test
+      TZ: Asia/Tokyo
+    tmpfs:
+      - /var/lib/postgresql

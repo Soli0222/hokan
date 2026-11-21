@@ -1,0 +1,48 @@
+{
+  "name": "@hokan/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @hokan/db db:generate && tsx watch src/index.ts",
+    "dev:run": "tsx watch src/index.ts",
+    "build": "pnpm --filter @hokan/db db:generate && tsup",
+    "test": "pnpm --filter @hokan/db db:generate && vitest run",
+    "test:integration": "pnpm --filter @hokan/db db:generate && vitest run --config vitest.integration.config.ts",
+    "test:integration:run": "vitest run --config vitest.integration.config.ts",
+    "test:performance": "vitest run --config vitest.performance.config.ts",
+    "performance:compare": "tsx src/performance/compare.ts",
+    "test:db:migrate": "pnpm --filter @hokan/db prisma:migrate",
+    "typecheck": "pnpm --filter @hokan/db db:generate && tsc --project tsconfig.json --noEmit",
+    "prisma:generate": "pnpm --filter @hokan/db db:generate",
+    "prisma:migrate": "pnpm --filter @hokan/db prisma:migrate",
+    "db:push": "pnpm --filter @hokan/db db:push"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.9",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.2",
+    "@opentelemetry/sdk-node": "0.301.2",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "@prisma/instrumentation": "7.10.1",
+    "@hokan/db": "workspace:*",
+    "@hokan/shared": "workspace:*",
+    "hono": "^4.13.19",
+    "jose": "^6.2.17",
+    "openid-client": "^6.9.0",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "prisma": "^7.10.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "oauth2-mock-server": "^9.3.0",
+    "tsup": "^9.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

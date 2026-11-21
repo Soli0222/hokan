@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+minimumReleaseAge: 1440
+allowBuilds:
+  "@prisma/client": false
+  "@prisma/engines": true
+  esbuild: true
+  prisma: true
+  protobufjs: true
