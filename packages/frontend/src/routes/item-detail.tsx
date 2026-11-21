@@ -78,6 +78,16 @@ function toDraft(detail: ItemDetailResponse): Draft {
   };
 }
 
+// 前回同期から変更していないフィールドは新しい値、変更済みのフィールドは入力中の値を残す。
+function mergeEdited(current: Draft, base: Draft, next: Draft): Draft {
+  return Object.fromEntries(
+    (Object.keys(next) as Array<keyof Draft>).map((key) => [
+      key,
+      current[key] === base[key] ? next[key] : current[key],
+    ]),
+  ) as Draft;
+}
+
 export function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -95,10 +105,25 @@ export function ItemDetailPage() {
   const [disposalOpen, setDisposalOpen] = useState(searchParams.get("disposal") === "open");
   const [valuationOpen, setValuationOpen] = useState(false);
 
+  // 評価追加や確認操作での再取得で編集中の入力を消さないため、前回同期時点から
+  // 編集していないフィールドだけ新しい値に差し替える。別物品へ移動したときは
+  // 前の物品の編集を持ち越さない。
   const [syncedData, setSyncedData] = useState(data);
+  const [syncedDraft, setSyncedDraft] = useState<Draft | null>(null);
+  const [syncedId, setSyncedId] = useState(id);
+  if (id !== syncedId) {
+    setSyncedId(id);
+    setSyncedDraft(null);
+  }
   if (data !== syncedData) {
     setSyncedData(data);
-    if (data) setDraft(toDraft(data));
+    if (data) {
+      const next = toDraft(data);
+      setSyncedDraft(next);
+      setDraft((current) =>
+        current && syncedDraft && id === syncedId ? mergeEdited(current, syncedDraft, next) : next,
+      );
+    }
   }
 
   if (loading && !data) return <div className="p-6 text-sm text-ink-3">読み込み中…</div>;
