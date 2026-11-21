@@ -20,10 +20,10 @@ import {
   type NecessityTierValue,
 } from "@hokan/shared";
 
-const STATUS_OPTIONS: Array<{ value: ItemStatusValue | ""; label: string }> = [
+const STATUS_OPTIONS: Array<{ value: ItemStatusValue | "all"; label: string }> = [
   { value: "owned", label: "保有中" },
   { value: "disposed", label: "処分済み" },
-  { value: "", label: "すべて" },
+  { value: "all", label: "すべて" },
 ];
 
 export function ItemsPage() {
@@ -33,13 +33,13 @@ export function ItemsPage() {
 
   const name = params.get("name") ?? "";
   const category = params.get("category") ?? "";
-  const status = (params.get("status") ?? "owned") as ItemStatusValue | "";
+  const status = (params.get("status") ?? "owned") as ItemStatusValue | "all";
   const necessityTier = params.get("tier") ?? "";
 
   const query = new URLSearchParams();
   if (name) query.set("name", name);
   if (category) query.set("category", category);
-  if (status) query.set("status", status);
+  if (status !== "all") query.set("status", status);
   if (necessityTier) query.set("necessityTier", necessityTier);
 
   const { data, loading, error } = useResource<ItemListResponse>(

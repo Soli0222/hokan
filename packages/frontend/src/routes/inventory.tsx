@@ -29,9 +29,15 @@ export function InventoryPage() {
   if (category) query.set("category", category);
   if (location) query.set("location", location);
 
-  const { data, loading, error } = useResource<InventoryPendingResponse>(
+  const { data, loading, error, setData } = useResource<InventoryPendingResponse>(
     () => apiFetch(`/api/dashboard/inventory-pending?${query.toString()}`),
     [category, location],
+  );
+
+  // 保管場所の選択肢は絞り込み前の全対象から取る
+  const { data: unfiltered } = useResource<InventoryPendingResponse>(
+    () => apiFetch(`/api/dashboard/inventory-pending`),
+    [],
   );
 
   // M: 画面（フィルタ適用）を開いた時点の総件数。
@@ -55,6 +61,8 @@ export function InventoryPage() {
   function changeFilter(kind: "category" | "location", value: string) {
     if (kind === "category") setCategory(value);
     else setLocation(value);
+    // 古い data が残っている間に initialTotal を再計算しないよう、結果を先に空にする
+    setData(null);
     setInitialTotal(null);
     setSkipped(new Set());
     setDoneIds(new Set());
@@ -81,11 +89,11 @@ export function InventoryPage() {
 
   const locations = useMemo(() => {
     const set = new Set<string>();
-    for (const item of data?.items ?? []) {
+    for (const item of unfiltered?.items ?? []) {
       if (item.location) set.add(item.location);
     }
     return [...set].sort();
-  }, [data]);
+  }, [unfiltered]);
 
   return (
     <div className="grid gap-4">
@@ -141,7 +149,7 @@ export function InventoryPage() {
             <Button variant="primary" disabled={busy === item.id} onClick={() => confirm(item.id)}>
               確認した
             </Button>
-            <Button variant="secondary" onClick={() => navigate(`/items/${item.id}`)}>手放した</Button>
+            <Button variant="secondary" onClick={() => navigate(`/items/${item.id}?disposal=open`)}>手放した</Button>
             <Button variant="ghost" onClick={() => navigate(`/items/${item.id}`)}>編集</Button>
             <Button variant="ghost" onClick={() => skip(item.id)}>スキップ</Button>
           </div>

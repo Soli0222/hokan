@@ -42,7 +42,7 @@ export const createItemSchema = z.object({
   purchasePrice: nullable(nonNegativeMoneySchema),
   purchaseSource: nullable(text200Schema),
   conditionAtAcquisition: nullable(itemConditionSchema),
-  quantity: z.number().int().min(1).optional(),
+  quantity: z.number().int().min(1).max(INT4_MAX).optional(),
   purpose: nullable(notesSchema),
   location: nullable(text200Schema),
   necessityTier: nullable(necessityTierSchema),

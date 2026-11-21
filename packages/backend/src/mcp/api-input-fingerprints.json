@@ -15,7 +15,7 @@
   "packages/backend/src/routes/oauth-metadata.ts": "0c771a341115307ef9e93114446697325297f10106e49f416ebd65752394c907",
   "packages/backend/src/schemas/data-transfer.ts": "ffebaff4355e2f03099ef4f21bd027bdf36a4c888b0d5cf847d794a25035d1b8",
   "packages/backend/src/schemas/fields.ts": "2cd57f4d2cdf430b7b1604a23c0146a9bd6762a1946088de622f07a272318c51",
-  "packages/backend/src/schemas/items.ts": "6e6c35da0f40e10587e6a971179c5f8f7d5ec34fab243aa4e072ec8246e2251a",
+  "packages/backend/src/schemas/items.ts": "773b412a149a7408ed475d155f46fad141e682e5ae13f65e8edae40c03b40948",
   "packages/backend/src/services/data-transfer.ts": "fe4cb7d125c011593a88d8bf5e552ec32d3567072219d4c27018e2964e7965cc",
   "packages/backend/src/services/items.ts": "4e2d63fdb0f13d79fe862829f755a9c5c27684aa6ac95f9eec3120d5ff921954",
   "packages/shared/src/constants/items.ts": "48279e05012034cd5ff15e0ba39fbb5d5d249aa5a6cc93e1f8e747f9af40f162",

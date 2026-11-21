@@ -9,7 +9,7 @@ import type {
   ValuationLiquidityValue,
 } from "@hokan/shared";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
@@ -81,6 +81,7 @@ function toDraft(detail: ItemDetailResponse): Draft {
 export function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [version, setVersion] = useState(0);
   const { data, loading, error } = useResource<ItemDetailResponse>(
     () => apiFetch(`/api/items/${id}`),
@@ -91,7 +92,7 @@ export function ItemDetailPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [disposalOpen, setDisposalOpen] = useState(false);
+  const [disposalOpen, setDisposalOpen] = useState(searchParams.get("disposal") === "open");
   const [valuationOpen, setValuationOpen] = useState(false);
 
   const [syncedData, setSyncedData] = useState(data);
