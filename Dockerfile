@@ -45,5 +45,7 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 
 COPY --from=backend-build /deploy /app
 COPY --from=frontend-build /app/packages/frontend/dist /app/frontend-dist
+COPY --chmod=755 docker-entrypoint.sh /app/docker-entrypoint.sh
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy --schema prisma/schema.prisma && node dist/index.js"]

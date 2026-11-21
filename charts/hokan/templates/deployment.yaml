@@ -58,8 +58,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "hokan.postgresql.secretName" . }}
                   key: {{ include "hokan.postgresql.secretKey" . }}
-            - name: DATABASE_URL
-              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)"
+            # DATABASE_URL はイメージの entrypoint が POSTGRES_* から
+            # percent-encode して組み立てる（パスワードの予約文字対策）。
             {{- with .Values.config.logLevel }}
             - name: HOKAN_LOG_LEVEL
               value: {{ . | quote }}
