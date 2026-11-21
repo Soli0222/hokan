@@ -11,12 +11,13 @@ import {
 } from "@hokan/shared";
 import { z } from "zod";
 import { int32Schema, nonNegativeInt32Schema } from "../lib/validation";
+import { dateSchema } from "./fields";
 
 export const FORMAT_VERSION = 1;
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 const uuidSchema = z.string().uuid();
-const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const dateOnlySchema = dateSchema;
 const nullableDateOnlySchema = dateOnlySchema.nullable();
 
 const disposalSchema = z.object({

@@ -10,7 +10,7 @@ export function fromDateOnlyString(date: string): Date {
 }
 
 export function todayDateString(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
+  return toJstDateString(now);
 }
 
 const DAY_MS = 86_400_000;
