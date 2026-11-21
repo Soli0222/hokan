@@ -84,8 +84,8 @@ export function registerItemTools(server: McpServer, apiClient: HokanApiClient) 
       return textContent(`物品を登録しました: ${data.item.name}`, { item: data.item, disposal: data.disposal, valuations: data.valuations });
     });
 
-  registerTool(server, "update_item", "物品を部分更新する",
-    { id: uuidSchema.describe("取得元: list_items の items[].id"), ...itemFields },
+  registerTool(server, "update_item", "物品を部分更新する。変更したい項目だけ指定する",
+    { id: uuidSchema.describe("取得元: list_items の items[].id"), ...z.object(itemFields).partial().shape },
     updateToolAnnotations,
     async ({ id, ...patch }) => {
       const data = await apiClient.put<ItemDetailResponse>(`/api/items/${id}`, patch);
