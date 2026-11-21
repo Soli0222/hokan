@@ -8,6 +8,10 @@ metadata:
     app.kubernetes.io/component: postgresql
 spec:
   replicas: 1
+  # PVC を保持する単一レプリカなので、新旧 Pod の同時起動でボリュームが
+  # デッドロックしないよう Recreate にする。
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "hokan.selectorLabels" . | nindent 6 }}
