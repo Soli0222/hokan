@@ -1,0 +1,295 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createMcpOAuthService, oauthOwnerKey } from "./mcp-oauth";
+import { startMockMcpOAuthProvider, type MockMcpOAuthProvider } from "../test-helpers/mock-mcp-oauth";
+
+const RESOURCE = "https://hokan.example.com/mcp";
+
+describe("MCP OAuth configuration", () => {
+  it("is disabled without a resource URL and skips invalid settings when auth is disabled", () => {
+    expect(createMcpOAuthService({ authMode: "enabled", env: {} })).toBeNull();
+    expect(createMcpOAuthService({
+      authMode: "disabled",
+      env: { HOKAN_MCP_OAUTH_RESOURCE_URL: "not a url" },
+    })).toBeNull();
+  });
+
+  it.each([
+    [{ HOKAN_MCP_OAUTH_RESOURCE_URL: "http://hokan.example.com/mcp", HOKAN_OIDC_ISSUER: "https://issuer.example.com", HOKAN_OIDC_ALLOWED_SUBJECTS: "sub" }, "must use HTTPS"],
+    [{ HOKAN_MCP_OAUTH_RESOURCE_URL: "https://hokan.example.com/other", HOKAN_OIDC_ISSUER: "https://issuer.example.com", HOKAN_OIDC_ALLOWED_SUBJECTS: "sub" }, "path must be /mcp"],
+    [{ HOKAN_MCP_OAUTH_RESOURCE_URL: "https://hokan.example.com/mcp?x=1", HOKAN_OIDC_ISSUER: "https://issuer.example.com", HOKAN_OIDC_ALLOWED_SUBJECTS: "sub" }, "must not contain"],
+    [{ HOKAN_MCP_OAUTH_RESOURCE_URL: RESOURCE, HOKAN_OIDC_ALLOWED_SUBJECTS: "sub" }, "HOKAN_OIDC_ISSUER is required"],
+    [{ HOKAN_MCP_OAUTH_RESOURCE_URL: RESOURCE, HOKAN_OIDC_ISSUER: "https://issuer.example.com", HOKAN_OIDC_ALLOWED_SUBJECTS: "" }, "HOKAN_OIDC_ALLOWED_SUBJECTS is required"],
+  ])("rejects incomplete or invalid configuration", (env, message) => {
+    expect(() => createMcpOAuthService({ authMode: "enabled", env })).toThrow(message);
+  });
+});
+
+describe("MCP OAuth access tokens", () => {
+  let provider: MockMcpOAuthProvider;
+  let env: NodeJS.ProcessEnv;
+
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-01T00:00:00Z"));
+    provider = await startMockMcpOAuthProvider();
+    env = {
+      HOKAN_MCP_OAUTH_RESOURCE_URL: RESOURCE,
+      HOKAN_OIDC_ISSUER: provider.issuerUrl,
+      HOKAN_OIDC_ALLOWED_SUBJECTS: "allowed-sub",
+    };
+  });
+
+  afterAll(async () => {
+    await provider.stop();
+    vi.useRealTimers();
+  });
+
+  function service() {
+    return createMcpOAuthService({
+      authMode: "enabled",
+      env,
+      allowInsecureUrlsForTests: true,
+    })!;
+  }
+
+  it("discovers the canonical issuer and verifies an RFC 9068 access token", async () => {
+    const oauth = service();
+    expect(await oauth.getProviderMetadata()).toEqual({
+      issuer: provider.issuerUrl,
+      jwksUri: provider.jwksUrl,
+    });
+
+    const principal = await oauth.verifyAccessToken(await provider.signAccessToken({ audience: RESOURCE }));
+    expect(principal).toMatchObject({
+      kind: "oauth",
+      issuer: provider.issuerUrl,
+      subject: "allowed-sub",
+      clientId: "chatgpt-client",
+      resource: RESOURCE,
+      scopes: ["read:hokan", "write:hokan"],
+      readOnly: false,
+    });
+    expect(Object.isFrozen(principal)).toBe(true);
+    expect(Object.isFrozen(principal.scopes)).toBe(true);
+  });
+
+  it("accepts typed Bearer JWTs and keeps their owner stable across refresh", async () => {
+    const token = await provider.signAccessToken({ audience: RESOURCE, tokenProfile: "keycloak", scope: "read:hokan" });
+    const principal = await service().verifyAccessToken(token);
+    expect(principal).toMatchObject({ clientId: "chatgpt-client", subject: "allowed-sub", readOnly: true });
+    const refreshed = await service().verifyAccessToken(await provider.signAccessToken({ tokenProfile: "keycloak" }));
+    expect(oauthOwnerKey(principal)).toBe(oauthOwnerKey(refreshed));
+  });
+
+  it.each([
+    [{ claims: { typ: "ID" } }, "invalid_token"],
+    [{ claims: { typ: "Refresh" } }, "invalid_token"],
+    [{ claims: { typ: undefined } }, "invalid_token"],
+    [{ claims: { azp: "", client_id: "not-a-fallback" } }, "invalid_token"],
+    [{ claims: { azp: undefined } }, "invalid_token"],
+    [{ claims: { azp: ["client"] } }, "invalid_token"],
+    [{ audience: "https://other.example.com/mcp" }, "invalid_token"],
+    [{ subject: "other-sub" }, "forbidden"],
+    [{ scope: "openid" }, "insufficient_scope"],
+  ])("rejects Keycloak ID/refresh tokens and unauthorized access tokens", async (overrides, kind) => {
+    const token = await provider.signAccessToken({ tokenProfile: "keycloak", ...overrides });
+    await expect(service().verifyAccessToken(token)).rejects.toMatchObject({ kind });
+  });
+
+  it("derives the same owner key across token refresh and separates principals", async () => {
+    const oauth = service();
+    const first = await oauth.verifyAccessToken(await provider.signAccessToken({ audience: RESOURCE, jti: "one" }));
+    const refreshed = await oauth.verifyAccessToken(await provider.signAccessToken({ audience: RESOURCE, jti: "two", scope: "read:hokan" }));
+    const otherClient = await oauth.verifyAccessToken(await provider.signAccessToken({ audience: RESOURCE, clientId: "other", jti: "three" }));
+
+    expect(oauthOwnerKey(first)).toBe(oauthOwnerKey(refreshed));
+    expect(oauthOwnerKey(first)).not.toBe(oauthOwnerKey(otherClient));
+    expect(refreshed.readOnly).toBe(true);
+  });
+
+  it.each([
+    [{ audience: "https://other.example.com/mcp" }, "invalid_token", { reason: "invalid_claim", claim: "aud" }],
+    [{ issuer: "https://other.example.com/" }, "invalid_token", { reason: "invalid_claim", claim: "iss" }],
+    [{ typ: "JWT" }, "invalid_token", { reason: "invalid_token_type" }],
+    [{ alg: "PS256" }, "invalid_token", { reason: "unsupported_algorithm" }],
+    [{ expiresInSeconds: -60 }, "invalid_token", { reason: "expired_token", claim: "exp" }],
+    [{ notBeforeSeconds: 60 }, "invalid_token", { reason: "invalid_claim", claim: "nbf" }],
+    [{ issuedAtSeconds: Math.floor(Date.now() / 1000) + 60 }, "invalid_token", { reason: "future_iat", claim: "iat" }],
+    [{ omit: ["client_id"] }, "invalid_token", { reason: "invalid_claim", claim: "client_id" }],
+    [{ omit: ["jti"] }, "invalid_token", { reason: "invalid_claim", claim: "jti" }],
+    [{ omit: ["sub"] }, "invalid_token", { reason: "invalid_claim", claim: "sub" }],
+    [{ omit: ["iat"] }, "invalid_token", { reason: "invalid_claim", claim: "iat" }],
+    [{ omit: ["exp"] }, "invalid_token", { reason: "invalid_claim", claim: "exp" }],
+    [{ tokenProfile: "keycloak", claims: { azp: "" } }, "invalid_token", { reason: "invalid_claim", claim: "azp" }],
+    [{ claims: { scope: ["private-value"] } }, "invalid_token", { reason: "invalid_claim", claim: "scope" }],
+    [{ scope: "write:hokan unknown" }, "insufficient_scope", { reason: "insufficient_scope" }],
+    [{ subject: "denied-sub" }, "forbidden", { reason: "forbidden" }],
+  ] as const)("rejects invalid or unauthorized token variants with bounded diagnostics", async (overrides, kind, diagnostic) => {
+    await expect(service().verifyAccessToken(await provider.signAccessToken({
+      audience: RESOURCE,
+      ...overrides,
+      omit: "omit" in overrides ? [...overrides.omit] : undefined,
+    }))).rejects.toMatchObject({ kind, diagnostic });
+  });
+
+  it("does not accept a token signed by an unconfigured issuer key", async () => {
+    const other = await startMockMcpOAuthProvider();
+    try {
+      const token = await other.signAccessToken({ issuer: provider.issuerUrl, audience: RESOURCE });
+      await expect(service().verifyAccessToken(token)).rejects.toMatchObject({
+        kind: "invalid_token", diagnostic: { reason: "invalid_signature" },
+      });
+    } finally {
+      await other.stop();
+    }
+  });
+
+  it("rechecks expiry and the current subject allowlist for internal API calls", async () => {
+    let now = Date.now();
+    const dynamicEnv = { ...env };
+    const oauth = createMcpOAuthService({
+      authMode: "enabled",
+      env: dynamicEnv,
+      envProvider: () => dynamicEnv,
+      allowInsecureUrlsForTests: true,
+      now: () => now,
+    })!;
+    const principal = await oauth.verifyAccessToken(await provider.signAccessToken({ audience: RESOURCE }));
+
+    dynamicEnv.HOKAN_OIDC_ALLOWED_SUBJECTS = "other-sub";
+    expect(() => oauth.assertPrincipalCurrent(principal)).toThrow(expect.objectContaining({ kind: "forbidden" }));
+
+    dynamicEnv.HOKAN_OIDC_ALLOWED_SUBJECTS = "allowed-sub";
+    now = (principal.expiresAt + 10) * 1000;
+    expect(() => oauth.assertPrincipalCurrent(principal)).toThrow(expect.objectContaining({ kind: "invalid_token" }));
+  });
+
+  it("coalesces concurrent discovery and rejects mismatched discovery metadata", async () => {
+    let calls = 0;
+    const fetch = async () => {
+      calls += 1;
+      return Response.json({ issuer: "https://issuer.example.com/", jwks_uri: "https://issuer.example.com/jwks" });
+    };
+    const oauth = createMcpOAuthService({
+      authMode: "enabled",
+      env: {
+        HOKAN_MCP_OAUTH_RESOURCE_URL: RESOURCE,
+        HOKAN_OIDC_ISSUER: "https://issuer.example.com",
+        HOKAN_OIDC_ALLOWED_SUBJECTS: "sub",
+      },
+      fetch,
+    })!;
+    await Promise.all([oauth.getProviderMetadata(), oauth.getProviderMetadata()]);
+    expect(calls).toBe(1);
+
+    const mismatched = createMcpOAuthService({
+      authMode: "enabled",
+      env: {
+        HOKAN_MCP_OAUTH_RESOURCE_URL: RESOURCE,
+        HOKAN_OIDC_ISSUER: "https://issuer.example.com",
+        HOKAN_OIDC_ALLOWED_SUBJECTS: "sub",
+      },
+      fetch: async () => Response.json({ issuer: "https://evil.example.com", jwks_uri: "https://evil.example.com/jwks" }),
+    })!;
+    await expect(mismatched.getProviderMetadata()).rejects.toMatchObject({ kind: "unavailable" });
+  });
+
+  it("briefly caches discovery failures", async () => {
+    let calls = 0;
+    let now = 1_000;
+    const oauth = createMcpOAuthService({
+      authMode: "enabled",
+      env: {
+        HOKAN_MCP_OAUTH_RESOURCE_URL: RESOURCE,
+        HOKAN_OIDC_ISSUER: "https://issuer.example.com",
+        HOKAN_OIDC_ALLOWED_SUBJECTS: "sub",
+      },
+      fetch: async () => {
+        calls += 1;
+        return new Response(null, { status: 503 });
+      },
+      now: () => now,
+    })!;
+
+    await expect(oauth.getProviderMetadata()).rejects.toMatchObject({ kind: "unavailable" });
+    await expect(oauth.getProviderMetadata()).rejects.toMatchObject({ kind: "unavailable" });
+    expect(calls).toBe(1);
+
+    now += 5_001;
+    await expect(oauth.getProviderMetadata()).rejects.toMatchObject({ kind: "unavailable" });
+    expect(calls).toBe(2);
+  });
+
+  it("limits OAuth work before provider discovery and token verification", async () => {
+    const limitedEnv = {
+      HOKAN_MCP_OAUTH_RESOURCE_URL: RESOURCE,
+      HOKAN_OIDC_ISSUER: "https://issuer.example.com",
+      HOKAN_OIDC_ALLOWED_SUBJECTS: "sub",
+      HOKAN_MCP_OAUTH_MAX_REQUESTS_PER_MINUTE: "2",
+      HOKAN_MCP_OAUTH_MAX_CONCURRENT_REQUESTS: "1",
+    };
+    let now = 1_000;
+    let discoveryCalls = 0;
+    let releaseFetch!: () => void;
+    const fetchBlocked = new Promise<void>((resolve) => {
+      releaseFetch = resolve;
+    });
+    const oauth = createMcpOAuthService({
+      authMode: "enabled",
+      env: limitedEnv,
+      now: () => now,
+      fetch: async () => {
+        discoveryCalls += 1;
+        await fetchBlocked;
+        return new Response(null, { status: 503 });
+      },
+    })!;
+
+    const first = oauth.getProviderMetadata();
+    await expect(oauth.verifyAccessToken("not-a-jwt")).rejects.toMatchObject({
+      kind: "unavailable",
+      message: "Too many concurrent OAuth authentication requests",
+    });
+    releaseFetch();
+    await expect(first).rejects.toMatchObject({ kind: "unavailable" });
+
+    // Concurrency rejection does not consume the rate budget. The next admitted
+    // request uses the second slot and encounters the cached discovery failure.
+    await expect(oauth.verifyAccessToken("not-a-jwt")).rejects.toMatchObject({
+      kind: "unavailable",
+      message: "OAuth provider discovery is unavailable",
+    });
+    await expect(oauth.verifyAccessToken("not-a-jwt")).rejects.toMatchObject({ kind: "rate_limited" });
+    await expect(oauth.getProviderMetadata()).rejects.toMatchObject({ kind: "rate_limited" });
+    expect(discoveryCalls).toBe(1);
+
+    // Both the rate window and failure cache expire; the concurrency slot was
+    // released even though the admitted requests failed.
+    now += 60_000;
+    await expect(oauth.getProviderMetadata()).rejects.toMatchObject({
+      kind: "unavailable",
+      message: "OAuth provider discovery is unavailable",
+    });
+    expect(discoveryCalls).toBe(2);
+  });
+
+  it("classifies JWKS network failures as temporary verification unavailability", async () => {
+    const issuer = "https://issuer.example.com";
+    const oauth = createMcpOAuthService({
+      authMode: "enabled",
+      env: {
+        HOKAN_MCP_OAUTH_RESOURCE_URL: RESOURCE,
+        HOKAN_OIDC_ISSUER: issuer,
+        HOKAN_OIDC_ALLOWED_SUBJECTS: "allowed-sub",
+      },
+      fetch: async (input) => {
+        if (String(input).endsWith("/.well-known/openid-configuration")) {
+          return Response.json({ issuer, jwks_uri: `${issuer}/jwks` });
+        }
+        throw new TypeError("network unavailable");
+      },
+    })!;
+    const signed = await provider.signAccessToken({ issuer, audience: RESOURCE });
+    await expect(oauth.verifyAccessToken(signed)).rejects.toMatchObject({ kind: "unavailable" });
+  });
+});

@@ -1,0 +1,349 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  chart-guard:
+    name: Guard chart version
+    if: github.event_name == 'pull_request'
+    uses: Soli0222/shared-workflows/.github/workflows/chart-guard.yaml@v1.1.0
+
+  release-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install release check dependencies
+        run: |
+          python3 -m venv /tmp/hokan-release-venv
+          /tmp/hokan-release-venv/bin/pip install pyyaml
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Check release automation
+        run: make lint-workflows test-release PYTHON=/tmp/hokan-release-venv/bin/python
+
+  required:
+    name: CI required
+    if: always()
+    needs: [chart-guard, release-checks, version-check, lint, typecheck, test-unit, test-integration, test-e2e, test-build, performance, test-docker-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all CI jobs
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          jq -e --arg event "$EVENT" '
+            to_entries | all(.[];
+              .value.result == "success" or
+              ((.key == "performance" or .key == "chart-guard") and $event != "pull_request" and .value.result == "skipped")
+            )
+          ' <<< "$RESULTS"
+
+  version-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Check package versions
+        run: make version-check
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run lint
+        run: make lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run typecheck
+        run: make typecheck
+
+  test-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run unit tests
+        run: make test-unit
+
+  test-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run integration tests
+        run: make test-integration
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore Playwright browser cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: make test-e2e
+
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: playwright-artifacts
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run build
+        run: make build
+
+  performance:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out base
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Check out head
+        uses: actions/checkout@v7.0.1
+        with:
+          path: head
+
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: head/package.json
+          run_install: false
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+          cache-dependency-path: head/pnpm-lock.yaml
+
+      - name: Prepare base benchmark harness
+        run: |
+          # Copy the performance benchmark inputs so base and head run the same
+          # tests, Vitest config, and Makefile target.
+          mkdir -p base/packages/backend/src/performance
+          cp -R head/packages/backend/src/performance/. base/packages/backend/src/performance/
+          cp head/packages/backend/vitest.performance.config.ts base/packages/backend/vitest.performance.config.ts
+          cp head/Makefile base/Makefile
+
+          # Copy the current isolated-test runner and its runtime dependencies so
+          # the copied Makefile can execute `test-performance` in the base checkout.
+          # The base application code and dependencies stay at the base SHA.
+          mkdir -p base/scripts/test-isolation
+          cp head/scripts/run-isolated-test.mjs base/scripts/run-isolated-test.mjs
+          cp head/scripts/test-isolation/resources.mjs base/scripts/test-isolation/resources.mjs
+          cp head/scripts/test-isolation/docker-db.mjs base/scripts/test-isolation/docker-db.mjs
+          cp head/compose_db.yaml base/compose_db.yaml
+
+      - name: Install base dependencies
+        working-directory: base
+        run: pnpm install --frozen-lockfile
+
+      - name: Measure base
+        working-directory: base
+        run: make test-performance PERF_OUTPUT=${{ github.workspace }}/base-performance.json PERF_COMMIT=${{ github.event.pull_request.base.sha }}
+
+      - name: Install head dependencies
+        working-directory: head
+        run: pnpm install --frozen-lockfile
+
+      - name: Measure head
+        working-directory: head
+        run: make test-performance PERF_OUTPUT=${{ github.workspace }}/head-performance.json PERF_COMMIT=${{ github.event.pull_request.head.sha }}
+
+      - name: Compare performance
+        id: compare
+        working-directory: head
+        continue-on-error: true
+        run: pnpm --filter @hokan/backend performance:compare ${{ github.workspace }}/base-performance.json ${{ github.workspace }}/head-performance.json ${{ github.workspace }}/performance-comment.md
+
+      - name: Summarize performance result
+        if: always()
+        run: |
+          if [ -f performance-comment.md ]; then
+            cat performance-comment.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload performance artifacts
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: performance-results
+          path: |
+            base-performance.json
+            head-performance.json
+            performance-comment.md
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail on performance regression
+        if: steps.compare.outcome == 'failure'
+        run: exit 1
+
+  test-docker-build:
+    name: test-docker-build (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      REGISTRY: ghcr.io
+      TAGS: latest
+
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+          echo "REGISTRY_IMAGE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Check out the repo
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.REGISTRY_IMAGE }}
+          tags: ${{ env.TAGS }}
+
+      - name: Build Docker image
+        id: build
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          push: false
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=hokan-${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=hokan-${{ env.PLATFORM_PAIR }}

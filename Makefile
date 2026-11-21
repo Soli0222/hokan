@@ -1,0 +1,139 @@
+.PHONY: help version-set version-sync version-check test-db-up test-db-down lint typecheck test-unit test-integration test-e2e test-performance test-migration test-audit-stdout test-helm build build-docker \
+	act-lint act-typecheck act-test-unit act-test-integration act-test-e2e act-test-performance act-build act-all
+
+PYTHON ?= python3
+
+RUNNER := node scripts/run-isolated-test.mjs
+PERF_OUTPUT ?= performance-results/head.json
+PERF_COMMIT ?= local
+E2E_WORKERS ?= 4
+export E2E_WORKERS
+override E2E_ARGS := $(value E2E_ARGS)
+export E2E_ARGS
+VERSION ?=
+# Capture literal input once; never expand it as Make or shell code.
+override HOKAN_VERSION_INPUT := $(value VERSION)
+export HOKAN_VERSION_INPUT
+unexport VERSION
+
+help: ## Show this help
+	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
+
+# ---------------------------------------------------------------------------
+# Version targets
+# ---------------------------------------------------------------------------
+
+version-set: ## Set root and workspace package versions (VERSION=x.y.z)
+	@test -n "$$HOKAN_VERSION_INPUT" || (echo "VERSION is required" >&2; exit 1)
+	./scripts/set-version.sh "$$HOKAN_VERSION_INPUT"
+
+version-sync: ## Sync workspace package versions from root package.json
+	./scripts/sync-versions.sh
+
+version-check: ## Check workspace package versions are synchronized
+	./scripts/check-versions.sh "$$HOKAN_VERSION_INPUT"
+
+# ---------------------------------------------------------------------------
+# Local test targets
+# ---------------------------------------------------------------------------
+
+test-db-up: ## Start test DB for a fixed slot (requires HOKAN_TEST_SLOT)
+	node scripts/test-isolation/docker-db.mjs up
+
+test-db-down: ## Stop test DB for a fixed slot (requires HOKAN_TEST_SLOT)
+	node scripts/test-isolation/docker-db.mjs down
+
+lint: ## Run lint
+	pnpm lint
+
+typecheck: ## Run typecheck
+	pnpm --filter @hokan/db db:generate
+	pnpm typecheck
+	pnpm exec tsc --project e2e/tsconfig.json --noEmit
+
+test-unit: ## Run unit tests
+	pnpm test
+	node --test scripts/test-isolation/resources.test.mjs scripts/test-isolation/runner.test.mjs scripts/version-input.test.mjs
+	node --import ./packages/backend/node_modules/tsx/dist/loader.mjs --test e2e/helpers/scenario.test.ts
+
+test-integration: ## Run integration tests in an isolated test slot
+	$(RUNNER) integration
+
+test-e2e: ## Run E2E tests in an isolated test slot
+	$(RUNNER) e2e
+
+test-audit-stdout: build ## Verify production audit JSON on stdout in an isolated DB
+	$(RUNNER) audit
+
+test-migration: ## Rehearse audit history backup, DROP and restore in an isolated DB
+	$(RUNNER) migration
+
+test-performance: ## Run performance benchmarks in an isolated test slot
+	PERF_OUTPUT=$(PERF_OUTPUT) PERF_COMMIT=$(PERF_COMMIT) $(RUNNER) performance
+
+test-helm: ## Verify Helm environment rendering
+	@if helm template hokan charts/hokan --set audit.retentionDays=9 | rg -q 'name: HOKAN_AUDIT_LOG_RETENTION_DAYS'; then echo "Removed audit retention environment variable rendered" >&2; exit 1; fi
+	@if helm template hokan charts/hokan | rg -q 'name: HOKAN_MCP_OAUTH_RESOURCE_URL'; then echo "HOKAN_MCP_OAUTH_RESOURCE_URL rendered with the default empty value" >&2; exit 1; fi
+	@helm template hokan charts/hokan --set mcp.oauth.resourceUrl=https://hokan.example.com/mcp | rg -q 'name: HOKAN_MCP_OAUTH_RESOURCE_URL'
+	@helm template hokan charts/hokan --set mcp.oauth.resourceUrl=https://hokan.example.com/mcp | rg -q 'value: "https://hokan.example.com/mcp"'
+	@helm template hokan charts/hokan --set mcp.oauth.maxRequestsPerMinute=30 | rg -q 'name: HOKAN_MCP_OAUTH_MAX_REQUESTS_PER_MINUTE'
+	@helm template hokan charts/hokan --set mcp.oauth.maxConcurrentRequests=4 | rg -q 'name: HOKAN_MCP_OAUTH_MAX_CONCURRENT_REQUESTS'
+
+build-docker: ## Verify the production Docker build on the local architecture
+	docker build .
+
+build: ## Run production build
+	pnpm build
+
+# ---------------------------------------------------------------------------
+# act targets (GitHub Actions local runner)
+# ---------------------------------------------------------------------------
+
+act-lint: ## Run lint job via act
+	act -j lint
+
+act-typecheck: ## Run typecheck job via act
+	act -j typecheck
+
+act-test-unit: ## Run test-unit job via act
+	act -j test-unit
+
+act-test-integration: ## Run test-integration job via act (stops local DB first)
+	$(MAKE) test-db-down HOKAN_TEST_SLOT=0
+	act -j test-integration
+
+act-test-e2e: ## Run test-e2e job via act (stops local DB first)
+	$(MAKE) test-db-down HOKAN_TEST_SLOT=0
+	act -j test-e2e
+
+act-test-performance: ## Run performance job via act (stops local DB first)
+	$(MAKE) test-db-down HOKAN_TEST_SLOT=0
+	act -j performance
+
+act-build: ## Run build job via act
+	act -j test-build
+
+act-all: ## Run all act jobs sequentially (stops local DB first)
+	$(MAKE) test-db-down HOKAN_TEST_SLOT=0
+	act -j lint
+	act -j typecheck
+	act -j test-unit
+	act -j test-build
+	$(MAKE) test-db-down HOKAN_TEST_SLOT=0
+	act -j test-integration
+	$(MAKE) test-db-down HOKAN_TEST_SLOT=0
+	act -j test-e2e
+	$(MAKE) test-db-down HOKAN_TEST_SLOT=0
+
+
+.PHONY: test-version-input
+test-version-input: ## Check release version input handling
+	node --test scripts/version-input.test.mjs
+
+.PHONY: lint-workflows test-release
+lint-workflows: ## Validate GitHub Actions workflows (requires actionlint)
+	# actionlint's bundled metadata predates create-github-app-token v3 and concurrency.queue.
+	actionlint -shellcheck="" -ignore 'unexpected key "queue" for "concurrency" section' -ignore 'input "(client-id|permission-[^"]+)" is not defined'
+
+test-release: ## Test weekly merge, chart triage and release tag resolution
+	$(PYTHON) -m unittest discover -s scripts/release -p 'test_*.py'

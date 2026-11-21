@@ -1,0 +1,32 @@
+{
+  "name": "hokan",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.21.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @hokan/backend --filter @hokan/frontend dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "version:check": "./scripts/check-versions.sh",
+    "version:sync": "./scripts/sync-versions.sh",
+    "upgrade:latest": "pnpm -r upgrade --latest && pnpm upgrade --latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@hokan/db": "workspace:*",
+    "@hokan/shared": "workspace:*",
+    "@playwright/test": "^1.65.1",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "prisma": "^7.10.1",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.73.0"
+  }
+}

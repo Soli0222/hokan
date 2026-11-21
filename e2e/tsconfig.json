@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@hokan/db": ["../packages/db/src/index.ts"],
+      "@hokan/db/testing": ["../packages/db/src/testing.ts"]
+    }
+  },
+  "include": ["./**/*.ts"]
+}
