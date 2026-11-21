@@ -60,6 +60,7 @@ export function DataManagementPage() {
     } finally {
       setBusy(false);
       setPendingPayload(null);
+      setConfirmOpen(false);
     }
   }
 
