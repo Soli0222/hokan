@@ -4,6 +4,7 @@ import {
   compareInventoryOrder,
   computeDashboardSummary,
   computeItemMetrics,
+  needsInventoryConfirmation,
   selectSellCandidates,
 } from "./item-metrics";
 
@@ -89,6 +90,19 @@ describe("computeItemMetrics", () => {
   });
 });
 
+describe("needsInventoryConfirmation", () => {
+  it("targets unconfirmed or last-confirmed >180 days ago", () => {
+    const today = "2026-07-01";
+    expect(needsInventoryConfirmation(null, today)).toBe(true);
+    expect(needsInventoryConfirmation("2025-12-31", today)).toBe(true);
+    expect(needsInventoryConfirmation("2026-01-03", today)).toBe(false);
+    expect(needsInventoryConfirmation("2026-06-30", today)).toBe(false);
+    // 境界: ちょうど 180 日（2026-01-02→07-01）は対象外、181 日で対象
+    expect(needsInventoryConfirmation("2026-01-02", today)).toBe(false);
+    expect(needsInventoryConfirmation("2026-01-01", today)).toBe(true);
+  });
+});
+
 describe("compareInventoryOrder", () => {
   it("orders by lastConfirmedOn with nulls first, id as tiebreak", () => {
     const items = [
@@ -157,6 +171,7 @@ describe("computeDashboardSummary", () => {
       acquiredOn: null,
       purchasePrice: null,
       status: "owned" as const,
+      lastConfirmedOn: "2026-01-19",
       ...item,
     },
     disposal,
@@ -172,6 +187,7 @@ describe("computeDashboardSummary", () => {
             necessityTier: "dormant",
             acquiredOn: "2025-01-20",
             purchasePrice: 10000,
+            lastConfirmedOn: null,
           },
           [valuation({ estimatedResalePrice: 4000 })],
         ),
@@ -192,7 +208,7 @@ describe("computeDashboardSummary", () => {
     expect(summary.dormantCount).toBe(1);
     expect(summary.dormantPurchaseTotal).toBe(10000);
     expect(summary.dormantEstimatedResaleTotal).toBe(4000);
-    // 2025-01-20→2026-01-20 は 365 日、2026-01-01 は 19 日。disposed は対象外。
+    // 未確認（lastConfirmedOn=null）のみ対象。残りは 2026-01-19 確認済み（1日前）。
     expect(summary.heldOver180DaysCount).toBe(1);
 
     const game = summary.categories.find((c) => c.category === "game");

@@ -38,7 +38,7 @@ export function DashboardPage() {
         <StatCard
           label="180日超過"
           value={`${data.heldOver180DaysCount} 件`}
-          sub="保有 180 日を超える物品"
+          sub="未確認 or 最終確認から180日超"
         />
       </div>
 

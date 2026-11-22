@@ -47,6 +47,17 @@ export function computeItemMetrics(
   return { holdingDays, holdingMonths, proceeds, effectiveCost, monthlyCost, recoveryRate, latestValuation: latest };
 }
 
+/**
+ * 棚卸し対象の判定: 未確認（lastConfirmedOn が NULL）か、最終確認から
+ * 180 日を超えた物品。「確認した」で一覧から消えるため棚卸し進捗が分かる。
+ */
+export function needsInventoryConfirmation(
+  lastConfirmedOn: string | null,
+  today: string = todayDateString(),
+): boolean {
+  return lastConfirmedOn === null || daysBetween(lastConfirmedOn, today) > 180;
+}
+
 /** 棚卸し対象の並び順: lastConfirmedOn 古い順（NULL 先頭）、同値は id 順。 */
 export function compareInventoryOrder(
   a: { lastConfirmedOn: string | null; id: string },
@@ -159,6 +170,7 @@ export interface DashboardSummary {
 export interface DashboardItemInput extends MetricInput {
   category: string;
   necessityTier: NecessityTier | null;
+  lastConfirmedOn: string | null;
 }
 
 export function computeDashboardSummary(
@@ -200,7 +212,7 @@ export function computeDashboardSummary(
       summary.dormantPurchaseTotal += purchase;
       summary.dormantEstimatedResaleTotal += estimate;
     }
-    if (metrics.holdingDays !== null && metrics.holdingDays > 180) {
+    if (needsInventoryConfirmation(item.lastConfirmedOn, today)) {
       summary.heldOver180DaysCount += 1;
     }
 
