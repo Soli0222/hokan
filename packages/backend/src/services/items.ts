@@ -1,5 +1,6 @@
 import {
   compareInventoryOrder,
+  needsInventoryConfirmation,
   computeDashboardSummary,
   computeItemMetrics,
   daysBetween,
@@ -305,6 +306,7 @@ export async function getDashboard(prisma: PrismaClient): Promise<DashboardRespo
         acquiredOn: toDateOnlyString(row.acquiredOn),
         purchasePrice: row.purchasePrice,
         status: row.status,
+        lastConfirmedOn: toDateOnlyString(row.lastConfirmedOn),
       },
       disposal: row.disposal ? toDisposal(row.disposal) : null,
       valuations: row.valuations.map(toValuation),
@@ -402,6 +404,7 @@ export async function listInventoryPending(
   const rows = await prisma.item.findMany({ where, include: itemInclude });
   const items = rows
     .map((row) => toItemResponse(row))
+    .filter((item) => needsInventoryConfirmation(item.lastConfirmedOn))
     .sort(compareInventoryOrder);
   return { items, total: items.length };
 }

@@ -16,9 +16,10 @@ import {
 } from "@hokan/shared";
 
 /**
- * 棚卸し画面（仕様 4.2）。対象は owned のみ、lastConfirmedOn 古い順（NULL 先頭、同値は id 順）
- * をバックエンドが返す。M は画面を開いた時点の件数をメモリに保持し、スキップは DB を変えず
- * その場で再表示しないだけ。
+ * 棚卸し画面（仕様 4.2）。対象は owned かつ未確認 or 最終確認から180日超の物品のみ、
+ * lastConfirmedOn 古い順（NULL 先頭、同値は id 順）をバックエンドが返す。
+ * 「確認した」で対象から消え、残り件数が減る。M は画面を開いた時点の件数を
+ * メモリに保持し、スキップは DB を変えずその場で再表示しないだけ。
  */
 export function InventoryPage() {
   const navigate = useNavigate();

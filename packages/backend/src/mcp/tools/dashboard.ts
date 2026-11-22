@@ -58,7 +58,7 @@ export function registerDashboardTools(server: McpServer, apiClient: HokanApiCli
       );
     });
 
-  registerTool(server, "list_inventory_pending", "棚卸し対象を lastConfirmedOn 古い順（未確認先頭）で返す。category と location（'unset'=未設定）で絞り込み",
+  registerTool(server, "list_inventory_pending", "棚卸し対象（未確認 or 最終確認から180日超の owned）を lastConfirmedOn 古い順（未確認先頭）で返す。category と location（'unset'=未設定）で絞り込み",
     {
       category: itemCategorySchema.optional(),
       location: z.string().max(200).optional().describe("登録済み保管場所の完全一致、または 'unset' で未設定"),

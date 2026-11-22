@@ -17,12 +17,12 @@
   "packages/backend/src/schemas/fields.ts": "6630356d10f75f476933cdddd1022c4fc8579d086f0a6d75c848222f554c4fd7",
   "packages/backend/src/schemas/items.ts": "773b412a149a7408ed475d155f46fad141e682e5ae13f65e8edae40c03b40948",
   "packages/backend/src/services/data-transfer.ts": "fe4cb7d125c011593a88d8bf5e552ec32d3567072219d4c27018e2964e7965cc",
-  "packages/backend/src/services/items.ts": "4e2d63fdb0f13d79fe862829f755a9c5c27684aa6ac95f9eec3120d5ff921954",
+  "packages/backend/src/services/items.ts": "ab7b34e76d4cd7d06374ba3598b38b6f44fc4bb812d5ddd53f1593fc64e6d3df",
   "packages/shared/src/constants/items.ts": "48279e05012034cd5ff15e0ba39fbb5d5d249aa5a6cc93e1f8e747f9af40f162",
   "packages/shared/src/constants/limits.ts": "f843d88e48be593aeeeb6593c9d4824c8d824321d5439dd3a9ad585765185bc5",
   "packages/shared/src/index.ts": "d30c67f02b357d60f60717e2af8716ea96de3ca2883a7f931a152b41958e4e71",
   "packages/shared/src/lib/dates.ts": "776c2a8268719488b6fe8cb98a00639961e41e28daa86e8dd9c1a2cc74e1a5d4",
-  "packages/shared/src/lib/item-metrics.ts": "8a3def09b6e313f6ac457c99a58cf33b55db40c8e0c52afbe85274cf15b25dd1",
+  "packages/shared/src/lib/item-metrics.ts": "916a2e737b326ed40e35fcb374750b59eacd142bd3ebf2496b6dd15d86541997",
   "packages/shared/src/types/api.ts": "c9d4f40687faa326511feb2e18c6a9650981a16d7e543e8f2e69087a44eb7b79",
   "packages/shared/src/types/domain.ts": "7c526728866d772ecb500e85af8ad9adafeca571cd2f831495f45b693d4635b2"
 }
