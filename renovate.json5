@@ -1,8 +1,8 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    "security:minimumReleaseAgeNpm",
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'security:minimumReleaseAgeNpm',
     ':dependencyDashboard',
   ],
   pinDigests: false,
@@ -10,29 +10,39 @@
   assignees: [
     'Soli0222',
   ],
-  reviewers: ['Soli0222'],
+  reviewers: [
+    'Soli0222',
+  ],
   prConcurrentLimit: 20,
   prHourlyLimit: 10,
   semanticCommits: 'enabled',
   prCreation: 'immediate',
   rebaseWhen: 'auto',
-  dependencyDashboard: true,
+  dependencyDashboard: {
+    enabled: true,
+  },
   vulnerabilityAlerts: {
     enabled: true,
-    labels: ['security'],
+    labels: [
+      'security',
+    ],
   },
-  "rangeStrategy": "bump",
-  "automerge": true,
-  "automergeType": "pr",
-  "platformAutomerge": true,
+  rangeStrategy: 'bump',
+  automerge: true,
+  automergeType: 'pr',
+  platformAutomerge: true,
   'helm-values': {
     enabled: false,
   },
   customManagers: [
     {
       customType: 'regex',
-      managerFilePatterns: ['/^\\.github/workflows/renovate\\.yaml$/'],
-      matchStrings: ['renovate-version:\\s*"(?<currentValue>\\d+\\.\\d+\\.\\d+)"'],
+      managerFilePatterns: [
+        '/^\\.github/workflows/renovate\\.yaml$/',
+      ],
+      matchStrings: [
+        'renovate-version:\\s*"(?<currentValue>\\d+\\.\\d+\\.\\d+)"',
+      ],
       depNameTemplate: 'ghcr.io/renovatebot/renovate',
       datasourceTemplate: 'docker',
     },
@@ -47,9 +57,6 @@
       datasourceTemplate: 'docker',
       versioningTemplate: 'docker',
     },
-    // Chart.yaml の appVersion を「公開済みの」image に追従させる。
-    // 通常は release-please の PR が appVersion を更新する。
-    // パイプライン外で公開された image への追従用に残している。
     {
       customType: 'regex',
       managerFilePatterns: [
@@ -62,9 +69,6 @@
       versioningTemplate: 'docker',
     },
   ],
-  // image tag / appVersion を上げたら同じ PR で chart version の patch を上げる。
-  // これが無いと chart-guard の経路 B が成立しない。
-  // experimental な機能なので renovate のバージョン更新時は挙動を確認する。
   bumpVersions: [
     {
       filePatterns: [
@@ -76,12 +80,18 @@
       bumpType: 'patch',
     },
   ],
-  "packageRules": [
+  packageRules: [
     {
       description: 'Keep the root ESLint compiler API on TypeScript 6 until typescript-eslint supports TypeScript 7',
-      matchManagers: ['npm'],
-      matchFileNames: ['package.json'],
-      matchPackageNames: ['typescript'],
+      matchManagers: [
+        'npm',
+      ],
+      matchFileNames: [
+        'package.json',
+      ],
+      matchPackageNames: [
+        'typescript',
+      ],
       allowedVersions: '<7',
     },
     {
@@ -104,47 +114,55 @@
     },
     {
       description: 'Review major chart image updates, matching the other application repositories',
-      matchManagers: ['custom.regex'],
-      matchFileNames: ['charts/**'],
-      matchUpdateTypes: ['major'],
+      matchManagers: [
+        'custom.regex',
+      ],
+      matchFileNames: [
+        'charts/**',
+      ],
+      matchUpdateTypes: [
+        'major',
+      ],
       automerge: false,
-      addLabels: ['major-update'],
+      addLabels: [
+        'major-update',
+      ],
     },
     {
-      "description": "Track the latest stable Node.js release, including new majors before LTS.",
-      "matchPackageNames": [
-        "node",
-        "@types/node"
+      description: 'Track the latest stable Node.js release, including new majors before LTS.',
+      matchPackageNames: [
+        'node',
+        '@types/node',
       ],
-      "versioning": "npm",
-      "enabled": true,
-      "ignoreUnstable": true,
-      "separateMajorMinor": false,
-      "automerge": true,
-      "semanticCommitType": "fix"
+      versioning: 'npm',
+      enabled: true,
+      ignoreUnstable: true,
+      separateMajorMinor: false,
+      automerge: true,
+      semanticCommitType: 'fix',
     },
     {
-      "description": "Do not delay runtime security updates; keep npm package cooldowns.",
-      "matchPackageNames": [
-        "node"
+      description: 'Do not delay runtime security updates; keep npm package cooldowns.',
+      matchPackageNames: [
+        'node',
       ],
-      "groupName": "Node.js",
-      "prPriority": 10,
-      "prConcurrentLimit": 0,
-      "branchConcurrentLimit": 0,
-      "prHourlyLimit": 0,
-      "minimumReleaseAge": "0 days",
-      "minimumReleaseAgeBehaviour": "timestamp-optional"
+      groupName: 'Node.js',
+      prPriority: 10,
+      prConcurrentLimit: 0,
+      branchConcurrentLimit: 0,
+      prHourlyLimit: 0,
+      minimumReleaseAge: '0 days',
+      minimumReleaseAgeBehaviour: 'timestamp-optional',
     },
     {
-      "description": "Separate the Docker variant from the stable Node.js version.",
-      "matchDatasources": [
-        "docker"
+      description: 'Separate the Docker variant from the stable Node.js version.',
+      matchDatasources: [
+        'docker',
       ],
-      "matchPackageNames": [
-        "node"
+      matchPackageNames: [
+        'node',
       ],
-      "versionCompatibility": "^(?<version>[^-]+)(?<compatibility>-.*)?$"
+      versionCompatibility: '^(?<version>[^-]+)(?<compatibility>-.*)?$',
     },
   ],
 }
