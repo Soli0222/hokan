@@ -2,7 +2,7 @@
   "name": "hokan",
   "version": "0.1.1",
   "private": true,
-  "packageManager": "pnpm@12.21.0",
+  "packageManager": "pnpm@12.23.0",
   "scripts": {
     "dev": "pnpm -r --parallel --filter @hokan/backend --filter @hokan/frontend dev",
     "build": "pnpm -r build",
